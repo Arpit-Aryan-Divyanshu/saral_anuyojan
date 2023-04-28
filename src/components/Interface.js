@@ -12,6 +12,7 @@ import Select from '@mui/material/Select';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import Multiselect from 'multiselect-react-dropdown';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import Typography from '@mui/material/Typography';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
@@ -20,26 +21,38 @@ import { Close } from '@mui/icons-material';
 import ReactJson from 'react-json-view'
 import { JSONTree } from 'react-json-tree';
 import { Graph } from 'react-json-graph';
+import { JsonToTable } from "react-json-to-table";
 
 
 const theme = createTheme();
 export default function Home() {
-  const [result, setResult] = React.useState("");
+  const [result, setResult] = React.useState();
   const [checked, setChecked] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [queryName, setQueryName] = React.useState("");
   const [bg, setBg] = React.useState();
   const containerRef = React.useRef(null);
-  const [select, setSelect] = React.useState('');
+  const [select, setSelect] = React.useState();
   const [whereone, setWhereone] = React.useState('');
   const [wheretwo, setWheretwo] = React.useState('');
   const [wherethree, setWherethree] = React.useState('');
   const [from, setFrom] = React.useState('');
+  const [contains, setContains] = React.useState('');
   const [groupby, setGroupby] = React.useState('');
+  const [tableData, setTableData] = React.useState();
+  
+  const [bgColor, setBgColor] = React.useState("1d1f21");
+  const options = [
+    {value: "o", name: "All"},
+    {value: "o/data[at0001]/events[at0006]/data[at0003]/items[at0004]", name: "Systolic Blood Pressure"},
+    {value: "o/data[at0001]/events[at0006]/data[at0003]/items[at0005]", name: "Diastolic Blood Pressure"},
+    {value: "o/data[at0001]/events[at0006]/data[at0003]/items[at0033]", name: "Comments"},
+    {value: "o/name/value", name: "Author Name"},
+    ]
 
-  const handleSelect = (event) => {
-    setSelect(event.target.value);
+  const handleSelect = (option) => {
+    setSelect(option);
   };
   const handleWhereOne = (event) => {
     setWhereone(event.target.value);
@@ -49,6 +62,9 @@ export default function Home() {
   };
   const handleWhereThree = (event) => {
     setWherethree(event.target.value);
+  };
+  const handleContains = (event) => {
+    setContains(event.target.value);
   };
   const handleFrom = (event) => {
     setFrom(event.target.value);
@@ -67,14 +83,55 @@ export default function Home() {
           console.log(err.message);
        });
    }, []);
+  var loadTable = () => {
+    const query = "select o/data[at0001]/events[at1042]/data[at0003] from ehr e contains observation o";
+    const addPosts = async () => {
+      await fetch('http://localhost:8080/ehrbase/rest/openehr/v1/query/aql', {
+      method: 'POST',
+      body: JSON.stringify({
+         "q": query,
+      }),
+      headers: {
+         'Content-type': 'application/json; charset=UTF-8',
+      },
+      })
+      .then((response) =>response.json())
+      .then((data) => {
+         setResult(data);
+        //  console.log(data);
+        var myTable = [];
+        for(var row of result.rows){
+          for(var item of row[0].items){
+            myTable.push({'name':item.name.value,'value':item.value,'path':`o/data[at0001]/events[at1042]/data[at0003]/items[${item['archetype_node_id']}]`})
+          }
+        }
+        console.log(myTable)
+        setTableData(myTable)
+      })
+      .catch((err) => {
+         console.log(err.message);
+      });
+      };
+    addPosts();
+    setBgColor("000000");
+    console.log(result)
+    setLoading(false);
+    setChecked(true);
+
+  }
   const handleSubmit = (event) => {
     setLoading(true);
     event.preventDefault();
     const data = new FormData(event.currentTarget);  
     setQuery(data.get('query'));
     setQueryName(data.get('query_name'));
-    const queryy = select + from + whereone + wheretwo + wherethree + groupby;
-    console.log(queryy);
+    var selected_options = []
+    for (let option of select){
+      selected_options.push(option.value)
+    }
+    const new_select = selected_options.join(',')
+    const queryy = "select " + new_select + from + contains + whereone + wheretwo + wherethree + groupby;
+    console.log(new_select);
     const addPosts = async () => {
       await fetch('http://localhost:8080/ehrbase/rest/openehr/v1/query/aql', {
       method: 'POST',
@@ -95,9 +152,11 @@ export default function Home() {
       });
       };
     addPosts();
+    setBgColor("1d1f21");
     setLoading(false);
     setChecked(true);
   };
+  
   
   const handleSaveQuery = () => {
         // const myq = {[queryName]:query};
@@ -140,21 +199,29 @@ export default function Home() {
             <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 1 }}>
                 <Box sx={{ minWidth: 150 }}>
                     <FormControl sx={{ m: 1 }} fullWidth>
-                        <InputLabel id="demo-simple-select-label">Select</InputLabel>
-                        <Select
+                        {/* <InputLabel id="demo-simple-select-label">Select</InputLabel> */}
+                        {/* <Select
                         labelId="demo-simple-select-label"
                         id="demo-simple-select"
                         value={select}
                         label="Select"
-                        onChange={handleSelect}
-                        >
-                        <MenuItem value={"select o"}>Observations</MenuItem>
+                        > */}
+                        <Multiselect
+                          labelId="demo-simple-select-label"
+                          id="demo-simple-select"
+                          label="Select"
+                          options={options} // Options to display in the dropdown
+                          selectedValues={select} // Preselected value to persist in dropdown
+                          onSelect={handleSelect} // Function will trigger on select event
+                          displayValue="name" // Property name to display in the dropdown options
+                        />
+                        {/* <MenuItem value={"select o"}>Observations</MenuItem>
                         <MenuItem value={"select c"}>Compositions</MenuItem>
                         <MenuItem value={"select o/data[at0001]/events[at0006]/data[at0003]/items[at0004]"}>Systolic Blood Pressure</MenuItem>
                         <MenuItem value={"select o/data[at0001]/events[at0006]/data[at0003]/items[at0005]"}>Diastolic Blood Pressure</MenuItem>
                         <MenuItem value={"select o/data[at0001]/events[at0006]/data[at0003]/items[at0033]"}>Comments</MenuItem>
-                        <MenuItem value={"select o/name/value"}>Author Name</MenuItem>
-                        </Select>
+                        <MenuItem value={"select o/name/value"}>Author Name</MenuItem> */}
+                        {/* </Select> */}
                     </FormControl>
                 </Box>
                 <Box sx={{ minWidth: 150 }} >
@@ -167,9 +234,23 @@ export default function Home() {
                         label="From"
                         onChange={handleFrom}
                         >
-                        <MenuItem value={" from EHR e contains observation o"}>Observations</MenuItem>
-                        <MenuItem value={" from EHR e contains observation o and composition c"}>Compositions</MenuItem>
-                        <MenuItem value={" from EHR e"}>EHR</MenuItem>
+                        <MenuItem value={" from EHR e"}>EHR- be658bf3-8550-42ab-a90d-fd52584e127c</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
+                <Box sx={{ minWidth: 150 }} >
+                    <FormControl sx={{ m: 1 }} fullWidth>
+                        <InputLabel id="demo-simple-select-label">Contains</InputLabel>
+                        <Select
+                        labelId="demo-simple-select-label"
+                        id="demo-simple-select"
+                        value={contains}
+                        label="Contains"
+                        onChange={handleContains}
+                        >
+                        <MenuItem value={" contains observation o"}>Observations</MenuItem>
+                        <MenuItem value={" contains composition c"}>Compositions</MenuItem>
+                        <MenuItem value={" contains observation o and composition c"}>Both</MenuItem>
                         <MenuItem value={""}>Nested Query</MenuItem>
                         </Select>
                     </FormControl>
@@ -250,6 +331,14 @@ export default function Home() {
                 Save Query
               </Button>
               </div>
+              <Button
+                onClick = {() => {loadTable();}}
+                fullWidth
+                variant="contained"
+                sx={{ m:1 }}
+              >
+                Load Table
+              </Button>
               <a href="/savedquery">Saved Queries</a>
             </Box>
           </Box>
@@ -277,12 +366,12 @@ export default function Home() {
                     mx: 4,
                     overflow: 'scroll',
                     height: '500px',
-                    backgroundColor: "#1d1f21",
+                    backgroundColor: bgColor,
                     opacity:'10' }} elevation={4}>
                   <Box>
                   <Grid container spacing={2}>
                     <Grid item xs={11}>
-                      <Typography variant='h5' align='center' color='white' style={{ paddingTop: '10px'}}>Output</Typography>
+                      <Typography variant='h5' align='center' color='1d1f21' style={{ paddingTop: '10px'}}>Output</Typography>
                     </Grid>
                     <Grid item xs={1}>         
                         <IconButton onClick={() => {setChecked(false);}}>
@@ -290,11 +379,12 @@ export default function Home() {
                         </IconButton>
                     </Grid>
                   </Grid>
-                    <Typography align='left' color='white' sx={{ paddingTop: '20px',paddingLeft: '20px',}}>
+                  
+                    {bgColor == "1d1f21" ? (<Typography align='left' color='white' sx={{ paddingTop: '20px',paddingLeft: '20px',}}>
                         <ReactJson src={result} theme="tomorrow"/>
                         {/* <JSONTree data={result} />; */}
                         {/* <Graph json={JSON.parse(result)}/> */}
-                    </Typography>
+                    </Typography>):(<JsonToTable json={tableData}></JsonToTable>)}
                   </Box>
                 </Paper>
           </Slide>}
